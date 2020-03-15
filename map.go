@@ -6,12 +6,12 @@ import (
 )
 
 const (
-	bucketCount = 4
-	levels      = 3
+	bucketCount = 8
+	levels      = 4
 	leaveCount  = 8
 )
 
-// Map is an immutable hash map with copy on write semantics
+// Map is an immutable hash map with copy-on-write semantics
 type Map struct {
 	root bucket
 }
@@ -41,14 +41,13 @@ func (m Map) Set(key, value interface{}) Map {
 		b = next
 	}
 
-	if len(b.values) == 0 {
-		b.values = make([]elementList, leaveCount, leaveCount)
-	} else {
-		b.values = append([]elementList{}, b.values...)
-	}
+	newValues := make([]elementList, leaveCount, leaveCount)
+	copy(newValues, b.values)
+	b.values = newValues
+
 	valueIndex := hash % leaveCount
 	list := b.values[valueIndex]
-	list = append(elementList{}, list...)
+	list = append(list[:0:0], list...)
 
 	for i, e := range list {
 		if e.key == key {
@@ -120,7 +119,10 @@ func (m Map) Delete(key interface{}) Map {
 	if len(b.values) == 0 {
 		return m
 	}
-	b.values = append([]elementList{}, b.values...)
+	newValues := make([]elementList, leaveCount, leaveCount)
+	copy(newValues, b.values)
+	b.values = newValues
+
 	valueIndex := hash % leaveCount
 	list := b.values[valueIndex]
 	list = append(elementList{}, list...)
