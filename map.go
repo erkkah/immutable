@@ -218,8 +218,6 @@ func hashValue(key interface{}) uint32 {
 		ptr := unsafe.Pointer(&val)
 		const size = unsafe.Sizeof(val)
 		bytes = (*[size]uint8)(ptr)[:size:size]
-	case []byte:
-		bytes = val
 	default:
 		t := reflect.TypeOf(key)
 		if !t.Comparable() {

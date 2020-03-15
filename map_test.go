@@ -58,6 +58,18 @@ func TestSetByArrayWorks(t *testing.T) {
 	}
 }
 
+func TestSetBySliceFails(t *testing.T) {
+	var m Map
+	array := [12]float32{}
+	key := array[:]
+	defer func() {
+		if recover() == nil {
+			t.Fail()
+		}
+	}()
+	m = m.Set(key, 4711)
+}
+
 func TestSetByIncomparableStructFails(t *testing.T) {
 	var m Map
 	key := struct {
