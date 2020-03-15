@@ -152,7 +152,6 @@ type element struct {
 func hashValue(key interface{}) uint32 {
 	var bytes []uint8
 
-	// Special fast cases here
 	switch val := key.(type) {
 	case string:
 		bytes = []byte(val)
@@ -178,37 +177,17 @@ func hashValue(key interface{}) uint32 {
 		bytes = (*[size]uint8)(ptr)[:size:size]
 	case []byte:
 		bytes = val
-	}
-
-	// Generic slow case use reflection
-	if len(bytes) == 0 {
+	default:
 		v := reflect.ValueOf(key)
-		var ptr unsafe.Pointer = unsafe.Pointer(&key)
-
-		switch v.Kind() {
-		case reflect.Array:
-			fallthrough
-		case reflect.Struct:
-			fallthrough
-		case reflect.Chan:
-			fallthrough
-		case reflect.Func:
-			fallthrough
-		case reflect.Interface:
-			fallthrough
-		case reflect.Map:
-			fallthrough
-		case reflect.Ptr:
-			fallthrough
-		case reflect.Slice:
-			fallthrough
-		case reflect.UnsafePointer:
-			panic("Invalid key type")
-		}
 		t := v.Type()
 		if !t.Comparable() {
 			panic("Key must be comparable")
 		}
+
+		s := reflect.New(t)
+		s.Elem().Set(v)
+		ptr := unsafe.Pointer(s.Pointer())
+
 		size := t.Size()
 		bytes = (*[512]uint8)(ptr)[:size:size]
 	}
