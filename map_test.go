@@ -174,6 +174,30 @@ func TestAddMany(t *testing.T) {
 	}
 }
 
+func TestRange(t *testing.T) {
+	var m Map
+	truth := 0
+	for i := 0; i < 10; i++ {
+		truth += 2 * i
+		m = m.Set(i, 2*i)
+	}
+	sum := 0
+	m.Range(func(key, value interface{}) bool {
+		sum += value.(int)
+		return false
+	})
+	if sum != 0 {
+		t.Fail()
+	}
+	m.Range(func(key, value interface{}) bool {
+		sum += value.(int)
+		return true
+	})
+	if sum != truth {
+		t.Fail()
+	}
+}
+
 const (
 	addValues = 1024
 	getValues = 10240

@@ -11,12 +11,23 @@ const (
 	leaveCount  = 8
 )
 
-// Map is an immutable hash map with copy-on-write semantics
+// Map is an immutable hash map with copy-on-write semantics.
+// Adding to or deleting from the map returns a new map instance.
+// Since the map is immutable, it is safe to use from multiple
+// concurrent threads without locks or other synchronization.
+//
+// Copying the map is cheap, but since it is a struct, it is not
+// done atomically. To get atomic copying, use atomic.Value.
+//
+// Map is different from Go map and sync.Map since it safe to
+// copy and is copied by value.
+//
+// The zero Map is empty and ready for use.
 type Map struct {
 	root bucket
 }
 
-// Set adds an entry to a map and returns the updated map
+// Set adds an entry to a map and returns the updated map.
 func (m Map) Set(key, value interface{}) Map {
 	hash := hashValue(key)
 
@@ -63,7 +74,7 @@ func (m Map) Set(key, value interface{}) Map {
 	return Map{root}
 }
 
-// Get retrieves a value from the map
+// Get retrieves a value from the map.
 func (m Map) Get(key interface{}) (interface{}, bool) {
 	hash := hashValue(key)
 
@@ -92,7 +103,8 @@ func (m Map) Get(key interface{}) (interface{}, bool) {
 	return nil, false
 }
 
-// Delete returns a map without entries matching the key
+// Delete returns a map without entries matching the key.
+// If no entry matches, the original map is returned.
 func (m Map) Delete(key interface{}) Map {
 	hash := hashValue(key)
 
@@ -137,6 +149,37 @@ func (m Map) Delete(key interface{}) Map {
 	return m
 }
 
+// Range calls visitor for each element in the map.
+// If visitor returns false, the iteration stops.
+// Since the map is immutable, it will not change during iteration.
+func (m Map) Range(visitor func(key, value interface{}) bool) {
+	m.root.visit(visitor)
+}
+
+func (b *bucket) visit(visitor func(key, value interface{}) bool) bool {
+	if len(b.values) > 0 {
+		for _, list := range b.values {
+			for _, e := range list {
+				keepGoing := visitor(e.key, e.value)
+				if !keepGoing {
+					return false
+				}
+			}
+		}
+	} else {
+		for _, child := range b.buckets {
+			if child == nil {
+				continue
+			}
+			keepGoing := child.visit(visitor)
+			if !keepGoing {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 type bucket struct {
 	buckets [bucketCount]*bucket
 	values  []elementList
@@ -178,15 +221,13 @@ func hashValue(key interface{}) uint32 {
 	case []byte:
 		bytes = val
 	default:
-		v := reflect.ValueOf(key)
-		t := v.Type()
+		t := reflect.TypeOf(key)
 		if !t.Comparable() {
 			panic("Key must be comparable")
 		}
 
-		s := reflect.New(t)
-		s.Elem().Set(v)
-		ptr := unsafe.Pointer(s.Pointer())
+		iface := (*ifaceWords)(unsafe.Pointer(&key))
+		ptr := iface.data
 
 		size := t.Size()
 		bytes = (*[512]uint8)(ptr)[:size:size]
@@ -199,4 +240,12 @@ func hashValue(key interface{}) uint32 {
 	}
 
 	return hash
+}
+
+// Hack!
+// ifaceWords is interface{} internal representation, copied
+// from sync.atomic.
+type ifaceWords struct {
+	typ  unsafe.Pointer
+	data unsafe.Pointer
 }
