@@ -48,14 +48,65 @@ func TestSetGetByInt(t *testing.T) {
 	}
 }
 
-func TestSetByArrayFails(t *testing.T) {
+func TestSetByArrayWorks(t *testing.T) {
 	var m Map
 	key := [12]float32{}
+	m = m.Set(key, 4711)
+	_, ok := m.Get(key)
+	if !ok {
+		t.Fail()
+	}
+}
+
+func TestSetByIncomparableStructFails(t *testing.T) {
+	var m Map
+	key := struct {
+		a []byte
+		b float32
+	}{}
 	defer func() {
 		if recover() == nil {
 			t.Fail()
 		}
 	}()
+
+	m = m.Set(key, 4711)
+}
+
+func TestSetByComparableStructWorks(t *testing.T) {
+	var m Map
+	key := struct {
+		a int
+		b float32
+	}{}
+	m = m.Set(key, 4711)
+	_, ok := m.Get(key)
+	if !ok {
+		t.Fail()
+	}
+}
+
+func TestSetByFuncFails(t *testing.T) {
+	var m Map
+	key := func() {}
+	defer func() {
+		if recover() == nil {
+			t.Fail()
+		}
+	}()
+
+	m = m.Set(key, 4711)
+}
+
+func TestSetByMapFails(t *testing.T) {
+	var m Map
+	key := map[int]int{}
+	defer func() {
+		if recover() == nil {
+			t.Fail()
+		}
+	}()
+
 	m = m.Set(key, 4711)
 }
 
@@ -123,6 +174,11 @@ func TestAddMany(t *testing.T) {
 	}
 }
 
+const (
+	addValues = 1024
+	getValues = 10240
+)
+
 func BenchmarkAddIntsImmutableMap(b *testing.B) {
 	var m atomic.Value
 	m.Store(Map{})
@@ -130,7 +186,7 @@ func BenchmarkAddIntsImmutableMap(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			for i := 0; i < b.N; i++ {
-				num := i % 1024
+				num := i % addValues
 				old := m.Load().(Map)
 				updated := old.Set(num, num)
 				m.Store(updated)
@@ -146,7 +202,7 @@ func BenchmarkAddIntsGoMap(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			for i := 0; i < b.N; i++ {
-				num := i % 1024
+				num := i % addValues
 				mutex.Lock()
 				m[num] = num
 				mutex.Unlock()
@@ -161,7 +217,7 @@ func BenchmarkAddIntsSyncMap(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			for i := 0; i < b.N; i++ {
-				num := i % 1024
+				num := i % addValues
 				m.Store(num, num)
 			}
 		}
@@ -171,7 +227,7 @@ func BenchmarkAddIntsSyncMap(b *testing.B) {
 func BenchmarkGetIntsImmutableMap(b *testing.B) {
 	var m Map
 	for i := 0; i < b.N; i++ {
-		num := i % 1024
+		num := i % getValues
 		m = m.Set(num, num)
 	}
 
@@ -182,9 +238,12 @@ func BenchmarkGetIntsImmutableMap(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			for i := 0; i < b.N; i++ {
-				num := i % 1024
+				num := i % getValues
 				loaded := mm.Load().(Map)
-				_, _ = loaded.Get(num)
+				_, ok := loaded.Get(num)
+				if !ok {
+					b.Fail()
+				}
 			}
 		}
 	})
@@ -193,7 +252,7 @@ func BenchmarkGetIntsImmutableMap(b *testing.B) {
 func BenchmarkGetIntsGoMap(b *testing.B) {
 	m := map[int]int{}
 	for i := 0; i < b.N; i++ {
-		num := i % 1024
+		num := i % getValues
 		m[num] = num
 	}
 
@@ -203,10 +262,13 @@ func BenchmarkGetIntsGoMap(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			for i := 0; i < b.N; i++ {
-				num := i % 1024
+				num := i % getValues
 				mutex.Lock()
-				_, _ = m[num]
+				_, ok := m[num]
 				mutex.Unlock()
+				if !ok {
+					b.Fail()
+				}
 			}
 		}
 	})
@@ -215,15 +277,18 @@ func BenchmarkGetIntsGoMap(b *testing.B) {
 func BenchmarkGetIntsSyncMap(b *testing.B) {
 	m := sync.Map{}
 	for i := 0; i < b.N; i++ {
-		num := i % 1024
+		num := i % getValues
 		m.Store(num, num)
 	}
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			for i := 0; i < b.N; i++ {
-				num := i % 1024
-				_, _ = m.Load(num)
+				num := i % getValues
+				_, ok := m.Load(num)
+				if !ok {
+					b.Fail()
+				}
 			}
 		}
 	})
