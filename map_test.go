@@ -194,13 +194,17 @@ func TestRange(t *testing.T) {
 		m = m.Set(i, 2*i)
 	}
 	sum := 0
+	keys := 0
 	m.Range(func(key, value interface{}) bool {
+		keys += key.(int)
 		sum += value.(int)
 		return false
 	})
-	if sum != 0 {
+	if sum != keys*2 {
 		t.Fail()
 	}
+
+	sum = 0
 	m.Range(func(key, value interface{}) bool {
 		sum += value.(int)
 		return true
@@ -226,6 +230,19 @@ func BenchmarkAddIntsImmutableMap(b *testing.B) {
 				old := m.Load().(Map)
 				updated := old.Set(num, num)
 				m.Store(updated)
+			}
+		}
+	})
+}
+
+func BenchmarkAddIntsImmutableOwnMap(b *testing.B) {
+	var m Map
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			for i := 0; i < b.N; i++ {
+				num := i % addValues
+				m = m.Set(num, num)
 			}
 		}
 	})

@@ -231,13 +231,7 @@ func hashValue(key interface{}) uint32 {
 		bytes = (*[512]uint8)(ptr)[:size:size]
 	}
 
-	var hash uint32
-
-	for _, byte := range bytes {
-		hash = hash*31 + uint32(byte)
-	}
-
-	return hash
+	return hashFunc(bytes)
 }
 
 // Hack!
