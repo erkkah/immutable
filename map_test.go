@@ -1,6 +1,7 @@
 package immutable
 
 import (
+	"math/rand"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -184,6 +185,25 @@ func TestAddMany(t *testing.T) {
 			t.Fail()
 		}
 	}
+}
+
+func TestSetGetRandom(t *testing.T) {
+	var m Map
+	buf := make([]byte, 128)
+
+	for i := 0; i < 10000; i++ {
+		_, _ = rand.Read(buf)
+		key := string(buf)
+		m = m.Set(key, i)
+	}
+
+	m.Range(func(key, value interface{}) bool {
+		val, ok := m.Get(key)
+		if !ok || val != value {
+			t.Fail()
+		}
+		return true
+	})
 }
 
 func TestRange(t *testing.T) {

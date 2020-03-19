@@ -6,9 +6,9 @@ import (
 )
 
 const (
-	bucketCount = 8
-	levels      = 4
-	leaveCount  = 8
+	bucketCount    uint32 = 8
+	levels         uint32 = 4
+	leafStartCount uint32 = 2
 )
 
 // Map is an immutable hash map with copy-on-write semantics.
@@ -24,17 +24,28 @@ const (
 //
 // The zero Map is empty and ready for use.
 type Map struct {
-	root bucket
+	leafCount uint32
+	capacity  uint32
+	size      uint32
+	root      bucket
 }
 
 // Set adds an entry to a map and returns the updated map.
 func (m Map) Set(key, value interface{}) Map {
 	hash := hashValue(key)
 
-	root := m.root
-	b := &root
+	if m.capacity == 0 {
+		m.leafCount = leafStartCount
+		m.capacity = mapCapacity(m.leafCount)
+	} else if m.size*2 >= m.capacity {
+		m.capacity *= 2
+		m.leafCount *= 2
+		m.root = *growLeaves(&m.root)
+	}
 
-	for level := 0; level < levels; level++ {
+	b := &m.root
+
+	for level := uint32(0); level < levels; level++ {
 		bucketIndex := hash % bucketCount
 
 		next := b.buckets[bucketIndex]
@@ -52,11 +63,11 @@ func (m Map) Set(key, value interface{}) Map {
 		b = next
 	}
 
-	newValues := make([]elementList, leaveCount, leaveCount)
+	newValues := make([]elementList, m.leafCount)
 	copy(newValues, b.values)
 	b.values = newValues
 
-	valueIndex := hash % leaveCount
+	valueIndex := hash % m.leafCount
 	list := b.values[valueIndex]
 	list = append(list[:0:0], list...)
 
@@ -65,21 +76,26 @@ func (m Map) Set(key, value interface{}) Map {
 			e.value = value
 			list[i] = e
 			b.values[valueIndex] = list
-			return Map{root}
+			return m
 		}
 	}
 
 	list = append(list, element{key, value})
 	b.values[valueIndex] = list
-	return Map{root}
+	m.size += 1
+	return m
 }
 
 // Get retrieves a value from the map.
 func (m Map) Get(key interface{}) (interface{}, bool) {
+	if m.capacity == 0 {
+		return nil, false
+	}
+
 	hash := hashValue(key)
 
 	b := &m.root
-	for level := 0; level < levels; level++ {
+	for level := uint32(0); level < levels; level++ {
 		bucketIndex := hash % bucketCount
 		next := b.buckets[bucketIndex]
 		if next == nil {
@@ -88,7 +104,7 @@ func (m Map) Get(key interface{}) (interface{}, bool) {
 		b = next
 		hash /= bucketCount
 	}
-	valueIndex := hash % leaveCount
+	valueIndex := hash % m.leafCount
 	if len(b.values) == 0 {
 		return nil, false
 	}
@@ -111,7 +127,7 @@ func (m Map) Delete(key interface{}) Map {
 	root := m.root
 	b := &root
 
-	for level := 0; level < levels; level++ {
+	for level := uint32(0); level < levels; level++ {
 		bucketIndex := hash % bucketCount
 
 		next := b.buckets[bucketIndex]
@@ -131,11 +147,11 @@ func (m Map) Delete(key interface{}) Map {
 	if len(b.values) == 0 {
 		return m
 	}
-	newValues := make([]elementList, leaveCount, leaveCount)
+	newValues := make([]elementList, m.leafCount)
 	copy(newValues, b.values)
 	b.values = newValues
 
-	valueIndex := hash % leaveCount
+	valueIndex := hash % m.leafCount
 	list := b.values[valueIndex]
 	list = append(elementList{}, list...)
 
@@ -143,7 +159,10 @@ func (m Map) Delete(key interface{}) Map {
 		if e.key == key {
 			list = append(list[0:i], list[i+1:]...)
 			b.values[valueIndex] = list
-			return Map{root}
+			return Map{
+				size: m.size - 1,
+				root: root,
+			}
 		}
 	}
 	return m
@@ -196,28 +215,35 @@ func hashValue(key interface{}) uint32 {
 	var bytes []uint8
 
 	switch val := key.(type) {
+
 	case string:
 		bytes = []byte(val)
+
 	case int:
 		ptr := unsafe.Pointer(&val)
 		const size = unsafe.Sizeof(val)
 		bytes = (*[size]uint8)(ptr)[:size:size]
+
 	case int32:
 		ptr := unsafe.Pointer(&val)
 		const size = unsafe.Sizeof(val)
 		bytes = (*[size]uint8)(ptr)[:size:size]
+
 	case int64:
 		ptr := unsafe.Pointer(&val)
 		const size = unsafe.Sizeof(val)
 		bytes = (*[size]uint8)(ptr)[:size:size]
+
 	case float32:
 		ptr := unsafe.Pointer(&val)
 		const size = unsafe.Sizeof(val)
 		bytes = (*[size]uint8)(ptr)[:size:size]
+
 	case float64:
 		ptr := unsafe.Pointer(&val)
 		const size = unsafe.Sizeof(val)
 		bytes = (*[size]uint8)(ptr)[:size:size]
+
 	default:
 		t := reflect.TypeOf(key)
 		if !t.Comparable() {
@@ -234,10 +260,47 @@ func hashValue(key interface{}) uint32 {
 	return hashFunc(bytes)
 }
 
+func mapCapacity(leafCount uint32) uint32 {
+	capacity := uint32(1)
+	for level := uint32(0); level < levels; level++ {
+		capacity *= bucketCount
+	}
+	capacity *= leafCount
+	return capacity
+}
+
+func growLeaves(b *bucket) *bucket {
+	clone := &bucket{}
+	if len(b.values) != 0 {
+		newLeafCount := uint32(len(b.values) * 2)
+		clone.values = make([]elementList, newLeafCount)
+		for _, list := range b.values {
+			for _, element := range list {
+				hash := hashValue(element.key)
+				for l := uint32(0); l < levels; l++ {
+					hash /= bucketCount
+				}
+
+				valueIndex := hash % newLeafCount
+				newList := clone.values[valueIndex]
+				newList = append(newList, element)
+				clone.values[valueIndex] = newList
+			}
+		}
+		return clone
+	}
+	for i, next := range b.buckets {
+		if next != nil {
+			clone.buckets[i] = growLeaves(next)
+		}
+	}
+	return clone
+}
+
 // Hack!
 // ifaceWords is interface{} internal representation, copied
 // from sync.atomic.
 type ifaceWords struct {
-	typ  unsafe.Pointer
+	_    unsafe.Pointer
 	data unsafe.Pointer
 }

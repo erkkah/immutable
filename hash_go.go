@@ -12,7 +12,7 @@ func hashFunc(bytes []byte) uint32 {
 	var hash maphash.Hash
 
 	hash.SetSeed(hashSeed)
-	hash.Write(bytes)
+	_, _ = hash.Write(bytes)
 
 	return uint32(hash.Sum64())
 }
