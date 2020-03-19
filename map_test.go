@@ -234,6 +234,16 @@ func TestRange(t *testing.T) {
 	}
 }
 
+func TestSize(t *testing.T) {
+	var m Map
+	for i := 0; i < 102; i++ {
+		m = m.Set(i, i)
+	}
+	if m.Size() != 102 {
+		t.Fail()
+	}
+}
+
 const (
 	addValues = 1024
 	getValues = 10240

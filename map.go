@@ -8,7 +8,7 @@ import (
 const (
 	bucketCount    uint32 = 8
 	levels         uint32 = 4
-	leafStartCount uint32 = 2
+	leafStartCount uint32 = 1
 )
 
 // Map is an immutable hash map with copy-on-write semantics.
@@ -38,9 +38,8 @@ func (m Map) Set(key, value interface{}) Map {
 		m.leafCount = leafStartCount
 		m.capacity = mapCapacity(m.leafCount)
 	} else if m.size*2 >= m.capacity {
-		m.capacity *= 2
 		m.leafCount *= 2
-		m.root = *growLeaves(&m.root)
+		m.capacity *= 2
 	}
 
 	b := &m.root
@@ -64,7 +63,25 @@ func (m Map) Set(key, value interface{}) Map {
 	}
 
 	newValues := make([]elementList, m.leafCount)
-	copy(newValues, b.values)
+
+	if uint32(len(b.values)) != m.leafCount {
+		for _, list := range b.values {
+			for _, element := range list {
+				hash := hashValue(element.key)
+				for l := uint32(0); l < levels; l++ {
+					hash /= bucketCount
+				}
+
+				valueIndex := hash % m.leafCount
+				newList := newValues[valueIndex]
+				newList = append(newList, element)
+				newValues[valueIndex] = newList
+			}
+		}
+	} else {
+		copy(newValues, b.values)
+	}
+
 	b.values = newValues
 
 	valueIndex := hash % m.leafCount
@@ -104,10 +121,12 @@ func (m Map) Get(key interface{}) (interface{}, bool) {
 		b = next
 		hash /= bucketCount
 	}
-	valueIndex := hash % m.leafCount
+
 	if len(b.values) == 0 {
 		return nil, false
 	}
+
+	valueIndex := hash % uint32(len(b.values))
 	list := b.values[valueIndex]
 
 	for _, e := range list {
@@ -151,7 +170,7 @@ func (m Map) Delete(key interface{}) Map {
 	copy(newValues, b.values)
 	b.values = newValues
 
-	valueIndex := hash % m.leafCount
+	valueIndex := hash % uint32(len(b.values))
 	list := b.values[valueIndex]
 	list = append(elementList{}, list...)
 
@@ -171,8 +190,13 @@ func (m Map) Delete(key interface{}) Map {
 // Range calls visitor for each element in the map.
 // If visitor returns false, the iteration stops.
 // Since the map is immutable, it will not change during iteration.
-func (m Map) Range(visitor func(key, value interface{}) bool) {
+func (m *Map) Range(visitor func(key, value interface{}) bool) {
 	m.root.visit(visitor)
+}
+
+// Size returns the number of elements in the map.
+func (m *Map) Size() uint32 {
+	return m.size
 }
 
 func (b *bucket) visit(visitor func(key, value interface{}) bool) bool {
@@ -267,34 +291,6 @@ func mapCapacity(leafCount uint32) uint32 {
 	}
 	capacity *= leafCount
 	return capacity
-}
-
-func growLeaves(b *bucket) *bucket {
-	clone := &bucket{}
-	if len(b.values) != 0 {
-		newLeafCount := uint32(len(b.values) * 2)
-		clone.values = make([]elementList, newLeafCount)
-		for _, list := range b.values {
-			for _, element := range list {
-				hash := hashValue(element.key)
-				for l := uint32(0); l < levels; l++ {
-					hash /= bucketCount
-				}
-
-				valueIndex := hash % newLeafCount
-				newList := clone.values[valueIndex]
-				newList = append(newList, element)
-				clone.values[valueIndex] = newList
-			}
-		}
-		return clone
-	}
-	for i, next := range b.buckets {
-		if next != nil {
-			clone.buckets[i] = growLeaves(next)
-		}
-	}
-	return clone
 }
 
 // Hack!
