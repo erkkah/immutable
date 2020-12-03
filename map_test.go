@@ -23,6 +23,14 @@ func TestGetEmptyByInteger(t *testing.T) {
 	}
 }
 
+func TestDeleteEmpty(t *testing.T) {
+	var m Map
+	v := m.Delete("something")
+	if v.Size() != 0 {
+		t.Fail()
+	}
+}
+
 func TestSetGetByString(t *testing.T) {
 	var m Map
 	key := "kawonka"
