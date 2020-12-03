@@ -99,7 +99,7 @@ func (m Map) Set(key, value interface{}) Map {
 
 	list = append(list, element{key, value})
 	b.values[valueIndex] = list
-	m.size += 1
+	m.size++
 	return m
 }
 
@@ -141,6 +141,10 @@ func (m Map) Get(key interface{}) (interface{}, bool) {
 // Delete returns a map without entries matching the key.
 // If no entry matches, the original map is returned.
 func (m Map) Delete(key interface{}) Map {
+	if m.capacity == 0 {
+		return m
+	}
+
 	hash := hashValue(key)
 
 	root := m.root
