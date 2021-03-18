@@ -264,10 +264,11 @@ func BenchmarkAddIntsImmutableMap(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			for i := 0; i < b.N; i++ {
-				num := i % addValues
-				old := m.Load().(Map)
-				updated := old.Set(num, num)
-				m.Store(updated)
+				for j := 0; j < addValues; j++ {
+					old := m.Load().(Map)
+					updated := old.Set(j, j)
+					m.Store(updated)
+				}
 			}
 		}
 	})
@@ -279,8 +280,9 @@ func BenchmarkAddIntsImmutableOwnMap(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			for i := 0; i < b.N; i++ {
-				num := i % addValues
-				m = m.Set(num, num)
+				for j := 0; j < addValues; j++ {
+					m = m.Set(j, j)
+				}
 			}
 		}
 	})
@@ -293,10 +295,11 @@ func BenchmarkAddIntsGoMap(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			for i := 0; i < b.N; i++ {
-				num := i % addValues
-				mutex.Lock()
-				m[num] = num
-				mutex.Unlock()
+				for j := 0; j < addValues; j++ {
+					mutex.Lock()
+					m[j] = j
+					mutex.Unlock()
+				}
 			}
 		}
 	})
@@ -308,8 +311,9 @@ func BenchmarkAddIntsSyncMap(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			for i := 0; i < b.N; i++ {
-				num := i % addValues
-				m.Store(num, num)
+				for j := 0; j < addValues; j++ {
+					m.Store(j, j)
+				}
 			}
 		}
 	})
@@ -317,9 +321,8 @@ func BenchmarkAddIntsSyncMap(b *testing.B) {
 
 func BenchmarkGetIntsImmutableMap(b *testing.B) {
 	var m Map
-	for i := 0; i < b.N; i++ {
-		num := i % getValues
-		m = m.Set(num, num)
+	for i := 0; i < getValues; i++ {
+		m = m.Set(i, i)
 	}
 
 	var mm atomic.Value
@@ -329,11 +332,12 @@ func BenchmarkGetIntsImmutableMap(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			for i := 0; i < b.N; i++ {
-				num := i % getValues
-				loaded := mm.Load().(Map)
-				_, ok := loaded.Get(num)
-				if !ok {
-					b.Fail()
+				for j := 0; j < getValues; j++ {
+					loaded := mm.Load().(Map)
+					_, ok := loaded.Get(j)
+					if !ok {
+						b.Fail()
+					}
 				}
 			}
 		}
@@ -342,9 +346,8 @@ func BenchmarkGetIntsImmutableMap(b *testing.B) {
 
 func BenchmarkGetIntsGoMap(b *testing.B) {
 	m := map[int]int{}
-	for i := 0; i < b.N; i++ {
-		num := i % getValues
-		m[num] = num
+	for i := 0; i < getValues; i++ {
+		m[i] = i
 	}
 
 	var mutex sync.Mutex
@@ -353,12 +356,13 @@ func BenchmarkGetIntsGoMap(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			for i := 0; i < b.N; i++ {
-				num := i % getValues
-				mutex.Lock()
-				_, ok := m[num]
-				mutex.Unlock()
-				if !ok {
-					b.Fail()
+				for j := 0; j < getValues; j++ {
+					mutex.Lock()
+					_, ok := m[j]
+					mutex.Unlock()
+					if !ok {
+						b.Fail()
+					}
 				}
 			}
 		}
@@ -367,18 +371,18 @@ func BenchmarkGetIntsGoMap(b *testing.B) {
 
 func BenchmarkGetIntsSyncMap(b *testing.B) {
 	m := sync.Map{}
-	for i := 0; i < b.N; i++ {
-		num := i % getValues
-		m.Store(num, num)
+	for i := 0; i < getValues; i++ {
+		m.Store(i, i)
 	}
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			for i := 0; i < b.N; i++ {
-				num := i % getValues
-				_, ok := m.Load(num)
-				if !ok {
-					b.Fail()
+				for j := 0; j < getValues; j++ {
+					_, ok := m.Load(j)
+					if !ok {
+						b.Fail()
+					}
 				}
 			}
 		}

@@ -266,10 +266,11 @@ func BenchmarkRandomAccessFillImmutableVector(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			for i := 0; i < b.N; i++ {
-				num := i % numValues
-				old := v.Load().(Vector)
-				updated := old.Set(uint32(num), i)
-				v.Store(updated)
+				for j := 0; j < numValues; j++ {
+					old := v.Load().(Vector)
+					updated := old.Set(uint32(j), j)
+					v.Store(updated)
+				}
 			}
 		}
 	})
@@ -281,8 +282,9 @@ func BenchmarkRandomAccessFillImmutableOwnVector(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			for i := 0; i < b.N; i++ {
-				num := i % numValues
-				v = v.Set(uint32(num), i)
+				for j := 0; j < numValues; j++ {
+					v = v.Set(uint32(j), j)
+				}
 			}
 		}
 	})
@@ -295,12 +297,30 @@ func BenchmarkRandomAccessFillGoArray(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			for i := 0; i < b.N; i++ {
-				num := i % numValues
-				mutex.Lock()
-				var old = a
-				old[num] = i
-				a = old
-				mutex.Unlock()
+				for j := 0; j < numValues; j++ {
+					mutex.Lock()
+					a[j] = j
+					mutex.Unlock()
+				}
+			}
+		}
+	})
+}
+
+func BenchmarkRandomAccessFillCopyGoArray(b *testing.B) {
+	var a [numValues]int
+	var mutex sync.Mutex
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			for i := 0; i < b.N; i++ {
+				for j := 0; j < numValues; j++ {
+					mutex.Lock()
+					var old = a
+					old[j] = j
+					a = old
+					mutex.Unlock()
+				}
 			}
 		}
 	})
@@ -313,13 +333,14 @@ func BenchmarkAppendImmutableVector(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			for i := 0; i < b.N; i++ {
-				num := i % numValues
-				old := v.Load().(Vector)
-				if num == 0 {
-					old = old.Resize(0)
+				for j := 0; j < numValues; j++ {
+					old := v.Load().(Vector)
+					if j == 0 {
+						old = old.Resize(0)
+					}
+					updated := old.Append(j)
+					v.Store(updated)
 				}
-				updated := old.Append(i)
-				v.Store(updated)
 			}
 		}
 	})
@@ -332,13 +353,14 @@ func BenchmarkAppendGoSlice(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			for i := 0; i < b.N; i++ {
-				num := i % numValues
-				mutex.Lock()
-				if num == 0 {
-					a = []int{}
+				for j := 0; j < numValues; j++ {
+					mutex.Lock()
+					if j == 0 {
+						a = []int{}
+					}
+					a = append(a, j)
+					mutex.Unlock()
 				}
-				a = append(a, i)
-				mutex.Unlock()
 			}
 		}
 	})
