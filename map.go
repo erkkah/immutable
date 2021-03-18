@@ -18,7 +18,7 @@ const (
 //
 // Copying the map is cheap, but since it is a struct, it is not
 // done atomically. To get atomic copying, use atomic.Value or
-// a plain pointer.
+// similar.
 //
 // Map is different from Go map and sync.Map since it safe to
 // copy and is copied by value.
