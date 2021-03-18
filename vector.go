@@ -42,27 +42,31 @@ func (v Vector) Set(index uint32, value interface{}) Vector {
 
 	index += v.offset
 
-	node := v.root
+	src := v.root
 	nodeIndex := index
 
 	newRoot := &vectorNode{}
-	newNode := newRoot
+	dst := newRoot
 
-	for level := uint32(1); level <= v.depth; level++ {
-		copy(newNode.children[:], node.children[:])
+	for level := uint32(1); level < v.depth; level++ {
+		copy(dst.children[:], src.children[:])
+
 		shifts := (v.depth - level) * bucketBits
 		nodeIndex = (index >> shifts) & bucketMask
+
 		nextNode := &vectorNode{}
-		newNode.children[nodeIndex] = nextNode
-		newNode = nextNode
-		node = node.children[nodeIndex]
-		if node == nil {
-			node = &vectorNode{}
+		dst.children[nodeIndex] = nextNode
+
+		dst = nextNode
+		src = src.children[nodeIndex]
+
+		if src == nil {
+			src = &vectorNode{}
 		}
 	}
 
-	copy(newNode.values[:], node.values[:])
-	newNode.values[nodeIndex] = value
+	copy(dst.values[:], src.values[:])
+	dst.values[index&bucketMask] = value
 
 	return Vector{
 		size:     v.size,
@@ -83,7 +87,7 @@ func (v Vector) Get(index uint32) interface{} {
 	node := v.root
 	nodeIndex := index
 
-	for level := uint32(1); level <= v.depth; level++ {
+	for level := uint32(1); level < v.depth; level++ {
 		shifts := (v.depth - level) * bucketBits
 		nodeIndex = (index >> shifts) & bucketMask
 		node = node.children[nodeIndex]
@@ -92,7 +96,7 @@ func (v Vector) Get(index uint32) interface{} {
 		}
 	}
 
-	return node.values[nodeIndex]
+	return node.values[index&bucketMask]
 }
 
 func (v Vector) Append(value interface{}) Vector {
