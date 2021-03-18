@@ -289,6 +289,7 @@ const (
 func BenchmarkRandomAccessFillImmutableVector(b *testing.B) {
 	var v atomic.Value
 	v.Store(Vector{}.Resize(numValues))
+	b.ResetTimer()
 
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
@@ -305,6 +306,7 @@ func BenchmarkRandomAccessFillImmutableVector(b *testing.B) {
 
 func BenchmarkRandomAccessFillImmutableOwnVector(b *testing.B) {
 	v := Vector{}.Resize(numValues)
+	b.ResetTimer()
 
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
@@ -320,6 +322,7 @@ func BenchmarkRandomAccessFillImmutableOwnVector(b *testing.B) {
 func BenchmarkRandomAccessFillGoArray(b *testing.B) {
 	var a [numValues]int
 	var mutex sync.Mutex
+	b.ResetTimer()
 
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
@@ -337,6 +340,7 @@ func BenchmarkRandomAccessFillGoArray(b *testing.B) {
 func BenchmarkRandomAccessFillCopyGoArray(b *testing.B) {
 	var a [numValues]int
 	var mutex sync.Mutex
+	b.ResetTimer()
 
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
@@ -353,9 +357,70 @@ func BenchmarkRandomAccessFillCopyGoArray(b *testing.B) {
 	})
 }
 
+func BenchmarkRandomAccessGetImmutableVector(b *testing.B) {
+	v := Vector{}.Resize(numValues)
+	for j := 0; j < numValues; j++ {
+		v = v.Set(uint32(j), j)
+	}
+	var vv atomic.Value
+	vv.Store(v)
+	b.ResetTimer()
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			for i := 0; i < b.N; i++ {
+				for j := 0; j < numValues; j++ {
+					vec := vv.Load().(Vector)
+					val := vec.Get(uint32(j))
+					_ = val
+				}
+			}
+		}
+	})
+}
+
+func BenchmarkRandomAccessGetImmutableOwnVector(b *testing.B) {
+	v := Vector{}.Resize(numValues)
+	for j := 0; j < numValues; j++ {
+		v = v.Set(uint32(j), j)
+	}
+	b.ResetTimer()
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			for i := 0; i < b.N; i++ {
+				for j := 0; j < numValues; j++ {
+					val := v.Get(uint32(j))
+					_ = val
+				}
+			}
+		}
+	})
+}
+
+func BenchmarkRandomAccessGetGoArray(b *testing.B) {
+	var a [numValues]int
+	var mutex sync.Mutex
+	b.ResetTimer()
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			for i := 0; i < b.N; i++ {
+				for j := 0; j < numValues; j++ {
+					mutex.Lock()
+					val := a[j]
+					_ = val
+					mutex.Unlock()
+				}
+			}
+		}
+	})
+}
+
 func BenchmarkAppendImmutableVector(b *testing.B) {
 	var v atomic.Value
 	v.Store(Vector{})
+	b.ResetTimer()
 
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
@@ -376,6 +441,7 @@ func BenchmarkAppendImmutableVector(b *testing.B) {
 func BenchmarkAppendGoSlice(b *testing.B) {
 	a := []int{}
 	var mutex sync.Mutex
+	b.ResetTimer()
 
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
@@ -388,6 +454,34 @@ func BenchmarkAppendGoSlice(b *testing.B) {
 					a = append(a, j)
 					mutex.Unlock()
 				}
+			}
+		}
+	})
+}
+
+func BenchmarkResizeGoSlice(b *testing.B) {
+	a := make([]int, 1000)
+	b.ResetTimer()
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			for i := 0; i < b.N; i++ {
+				b := make([]int, 10000)
+				copy(b, a)
+			}
+		}
+	})
+}
+
+func BenchmarkResizeImmutableVector(b *testing.B) {
+	a := Vector{}.Resize(1000)
+	b.ResetTimer()
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			for i := 0; i < b.N; i++ {
+				b := a.Resize(10000)
+				_ = b
 			}
 		}
 	})
