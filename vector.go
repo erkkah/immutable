@@ -52,11 +52,10 @@ func (v Vector) Set(index uint32, value interface{}) Vector {
 		shifts := (v.depth - level) * bucketBits
 		nodeIndex = (index >> shifts) & bucketMask
 
+		dst.children = make([]*vectorNode, bucketSize)
 		if src != nil {
-			dst.children = append(src.children[0:0:0], src.children...)
+			copy(dst.children, src.children)
 			src = src.children[nodeIndex]
-		} else {
-			dst.children = make([]*vectorNode, bucketSize)
 		}
 
 		nextNode := &vectorNode{}
