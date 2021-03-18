@@ -1,6 +1,10 @@
 package immutable
 
-import "testing"
+import (
+	"sync"
+	"sync/atomic"
+	"testing"
+)
 
 func TestGetEmptyVectorSize(t *testing.T) {
 	var v Vector
@@ -221,4 +225,93 @@ func TestSliceLimitedRanges(t *testing.T) {
 	if sliced.Get(0) != 511 {
 		t.Fail()
 	}
+}
+
+const (
+	numValues = 1024
+)
+
+func BenchmarkRandomAccessFillImmutableVector(b *testing.B) {
+	var v atomic.Value
+	v.Store(Vector{}.Resize(numValues))
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			for i := 0; i < b.N; i++ {
+				num := i % numValues
+				old := v.Load().(Vector)
+				updated := old.Set(uint32(num), i)
+				v.Store(updated)
+			}
+		}
+	})
+}
+
+func BenchmarkRandomAccessFillImmutableOwnVector(b *testing.B) {
+	v := Vector{}.Resize(numValues)
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			for i := 0; i < b.N; i++ {
+				num := i % numValues
+				v = v.Set(uint32(num), i)
+			}
+		}
+	})
+}
+
+func BenchmarkRandomAccessFillGoArray(b *testing.B) {
+	var a [numValues]int
+	var mutex sync.Mutex
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			for i := 0; i < b.N; i++ {
+				num := i % numValues
+				mutex.Lock()
+				var old = a
+				old[num] = i
+				a = old
+				mutex.Unlock()
+			}
+		}
+	})
+}
+
+func BenchmarkAppendImmutableVector(b *testing.B) {
+	var v atomic.Value
+	v.Store(Vector{})
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			for i := 0; i < b.N; i++ {
+				num := i % numValues
+				old := v.Load().(Vector)
+				if num == 0 {
+					old = old.Resize(0)
+				}
+				updated := old.Append(i)
+				v.Store(updated)
+			}
+		}
+	})
+}
+
+func BenchmarkAppendGoSlice(b *testing.B) {
+	a := []int{}
+	var mutex sync.Mutex
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			for i := 0; i < b.N; i++ {
+				num := i % numValues
+				mutex.Lock()
+				if num == 0 {
+					a = []int{}
+				}
+				a = append(a, i)
+				mutex.Unlock()
+			}
+		}
+	})
 }

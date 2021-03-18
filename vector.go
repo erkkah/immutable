@@ -21,7 +21,7 @@ type Vector struct {
 	// offset into storage structure, for slicing
 	offset uint32
 	// storage root
-	root vectorNode
+	root *vectorNode
 }
 
 type vectorNode struct {
@@ -42,7 +42,7 @@ func (v Vector) Set(index uint32, value interface{}) Vector {
 
 	index += v.offset
 
-	node := &v.root
+	node := v.root
 	nodeIndex := index
 
 	newRoot := &vectorNode{}
@@ -69,7 +69,7 @@ func (v Vector) Set(index uint32, value interface{}) Vector {
 		capacity: v.capacity,
 		depth:    v.depth,
 		offset:   v.offset,
-		root:     *newRoot,
+		root:     newRoot,
 	}
 }
 
@@ -80,7 +80,7 @@ func (v Vector) Get(index uint32) interface{} {
 
 	index += v.offset
 
-	node := &v.root
+	node := v.root
 	nodeIndex := index
 
 	for level := uint32(1); level <= v.depth; level++ {
@@ -108,10 +108,12 @@ func (v Vector) Resize(size uint32) Vector {
 
 	capacity := v.capacity
 	depth := v.depth
+	root := v.root
 
 	if capacity == 0 {
 		capacity = bucketSize
 		depth = 1
+		root = &vectorNode{}
 	}
 
 	for size > capacity {
@@ -124,7 +126,7 @@ func (v Vector) Resize(size uint32) Vector {
 		capacity: capacity,
 		depth:    depth,
 		offset:   offset,
-		root:     v.root,
+		root:     root,
 	}
 }
 
