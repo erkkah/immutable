@@ -120,6 +120,34 @@ func TestAppendNonEmpty(t *testing.T) {
 	}
 }
 
+func TestResizeGrowNonEmpty(t *testing.T) {
+	v := Vector{}.Resize(bucketSize)
+	for i := uint32(0); i < bucketSize; i++ {
+		v = v.Set(i, i)
+	}
+	v = v.Resize(200)
+	for i := uint32(0); i < bucketSize; i++ {
+		val := v.Get(i)
+		if val != i {
+			t.Fail()
+		}
+	}
+}
+
+func TestResizeShrinkNonEmpty(t *testing.T) {
+	v := Vector{}.Resize(bucketSize * 12)
+	for i := uint32(0); i < bucketSize; i++ {
+		v = v.Set(i, i)
+	}
+	v = v.Resize(bucketSize)
+	for i := uint32(0); i < bucketSize; i++ {
+		val := v.Get(i)
+		if val != i {
+			t.Fail()
+		}
+	}
+}
+
 func TestSetGetRange(t *testing.T) {
 	var v Vector
 	var expected [511]int

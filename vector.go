@@ -123,6 +123,7 @@ func (v Vector) Resize(size uint32) Vector {
 	for size > capacity {
 		capacity *= bucketSize
 		depth++
+		root = bumpUp(root)
 	}
 
 	return Vector{
@@ -132,6 +133,13 @@ func (v Vector) Resize(size uint32) Vector {
 		offset:   offset,
 		root:     root,
 	}
+}
+
+func bumpUp(root *vectorNode) *vectorNode {
+	src := root
+	newRoot := &vectorNode{}
+	newRoot.children[0] = src
+	return newRoot
 }
 
 func (v Vector) Slice(start, end uint32) Vector {
