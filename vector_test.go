@@ -255,6 +255,33 @@ func TestSliceLimitedRanges(t *testing.T) {
 	}
 }
 
+func TestRangeEmptyVector(t *testing.T) {
+	var v Vector
+
+	r := v.Elements()
+	for r.Next() {
+		t.Fail()
+	}
+}
+
+func TestVectorRange(t *testing.T) {
+	v := Vector{}.Resize(112)
+	v = v.Set(42, 42)
+	r := v.Elements()
+	times := uint32(0)
+	for r.Next() {
+		if times == 42 {
+			if r.Get() != 42 {
+				t.Fail()
+			}
+		}
+		times++
+	}
+	if times != v.Size() {
+		t.Fail()
+	}
+}
+
 const (
 	numValues = 1024
 )

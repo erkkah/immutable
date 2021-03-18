@@ -174,3 +174,56 @@ func (v Vector) Slice(start, end uint32) Vector {
 func (v Vector) Size() uint32 {
 	return v.size
 }
+
+type VectorRange struct {
+	vector       Vector
+	position     uint32
+	nodePosition uint32
+	root         *vectorNode
+	node         *vectorNode
+}
+
+func (vr *VectorRange) Next() bool {
+	if vr.root == nil {
+		vr.root = vr.vector.root
+		vr.nodePosition = bucketSize
+	} else {
+		vr.position++
+		vr.nodePosition++
+	}
+
+	if vr.position == vr.vector.size {
+		return false
+	}
+
+	if vr.root != nil && vr.nodePosition == bucketSize {
+		vr.nodePosition = 0
+		node := vr.root
+		depth := vr.vector.depth
+		index := vr.position
+		for level := uint32(1); level < depth; level++ {
+			if node == nil {
+				break
+			}
+			shifts := (depth - level) * bucketBits
+			nodeIndex := (index >> shifts) & bucketMask
+			node = node.children[nodeIndex]
+		}
+		vr.node = node
+	}
+
+	return true
+}
+
+func (vr *VectorRange) Get() interface{} {
+	if vr.node == nil {
+		return nil
+	}
+	return vr.node.values[vr.nodePosition]
+}
+
+func (v Vector) Elements() VectorRange {
+	return VectorRange{
+		vector: v,
+	}
+}
