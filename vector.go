@@ -25,8 +25,8 @@ type Vector struct {
 }
 
 type vectorNode struct {
-	values   [bucketSize]interface{}
-	children [bucketSize]*vectorNode
+	values   []interface{}
+	children []*vectorNode
 }
 
 const (
@@ -49,23 +49,28 @@ func (v Vector) Set(index uint32, value interface{}) Vector {
 	dst := newRoot
 
 	for level := uint32(1); level < v.depth; level++ {
-		copy(dst.children[:], src.children[:])
-
 		shifts := (v.depth - level) * bucketBits
 		nodeIndex = (index >> shifts) & bucketMask
+
+		if src != nil {
+			dst.children = append(src.children[0:0:0], src.children...)
+			src = src.children[nodeIndex]
+		} else {
+			dst.children = make([]*vectorNode, bucketSize)
+		}
 
 		nextNode := &vectorNode{}
 		dst.children[nodeIndex] = nextNode
 
 		dst = nextNode
-		src = src.children[nodeIndex]
-
-		if src == nil {
-			src = &vectorNode{}
-		}
 	}
 
-	copy(dst.values[:], src.values[:])
+	if dst.values == nil {
+		dst.values = make([]interface{}, bucketSize)
+	}
+	if src != nil {
+		copy(dst.values, src.values)
+	}
 	dst.values[index&bucketMask] = value
 
 	return Vector{
@@ -96,6 +101,9 @@ func (v Vector) Get(index uint32) interface{} {
 		}
 	}
 
+	if node.values == nil {
+		return nil
+	}
 	return node.values[index&bucketMask]
 }
 
@@ -137,7 +145,9 @@ func (v Vector) Resize(size uint32) Vector {
 
 func bumpUp(root *vectorNode) *vectorNode {
 	src := root
-	newRoot := &vectorNode{}
+	newRoot := &vectorNode{
+		children: make([]*vectorNode, bucketSize),
+	}
 	newRoot.children[0] = src
 	return newRoot
 }
