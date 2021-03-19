@@ -35,6 +35,9 @@ const (
 	bucketMask uint32 = bucketSize - 1
 )
 
+// Set sets the element at the given index and returns the updated
+// Vector.
+// Out of bounds access causes panic.
 func (v Vector) Set(index uint32, value interface{}) Vector {
 	if index >= v.size {
 		panic("Out of bounds vector access")
@@ -81,6 +84,8 @@ func (v Vector) Set(index uint32, value interface{}) Vector {
 	}
 }
 
+// Get returns the element at the given index.
+// Out of bounds access causes panic.
 func (v Vector) Get(index uint32) interface{} {
 	if index >= v.size {
 		panic("Out of bounds vector access")
@@ -106,11 +111,17 @@ func (v Vector) Get(index uint32) interface{} {
 	return node.values[index&bucketMask]
 }
 
+// Append adds an element and returns the updated Vector.
 func (v Vector) Append(value interface{}) Vector {
 	appended := v.Resize(v.size + 1)
 	return appended.Set(v.size, value)
 }
 
+// Resize Grows or shrinks a vector to the given size
+// and returns the resized vector.
+// The vector capacity is not affected unless needed to
+// grow the vector.
+// Allocated but ununsed storage is not affected.
 func (v Vector) Resize(size uint32) Vector {
 	offset := v.offset
 	if size == 0 {
@@ -121,7 +132,7 @@ func (v Vector) Resize(size uint32) Vector {
 	depth := v.depth
 	root := v.root
 
-	if capacity == 0 {
+	if capacity == 0 && size > 0 {
 		capacity = bucketSize
 		depth = 1
 		root = &vectorNode{}
@@ -151,6 +162,10 @@ func bumpUp(root *vectorNode) *vectorNode {
 	return newRoot
 }
 
+// Slice returns a slice of a vector for the specified range.
+// Ranges that extend the vector end returns a slice shorter
+// than the given range.
+// Invalid ranges causes panic.
 func (v Vector) Slice(start, end uint32) Vector {
 	if end < start {
 		panic("Invalid range")
@@ -171,6 +186,7 @@ func (v Vector) Slice(start, end uint32) Vector {
 	}
 }
 
+// Size returns vector size.
 func (v Vector) Size() uint32 {
 	return v.size
 }
@@ -183,6 +199,8 @@ type VectorRange struct {
 	node         *vectorNode
 }
 
+// Next moves to the next element and returns true
+// if there are more elements available.
 func (vr *VectorRange) Next() bool {
 	if vr.root == nil {
 		vr.root = vr.vector.root
@@ -215,6 +233,8 @@ func (vr *VectorRange) Next() bool {
 	return true
 }
 
+// Get returns the element at the current position of the
+// range.
 func (vr *VectorRange) Get() interface{} {
 	if vr.node == nil {
 		return nil
@@ -222,6 +242,7 @@ func (vr *VectorRange) Get() interface{} {
 	return vr.node.values[vr.nodePosition]
 }
 
+// Elements returns a range for iterating through the vector.
 func (v Vector) Elements() VectorRange {
 	return VectorRange{
 		vector: v,
