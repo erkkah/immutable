@@ -8,7 +8,7 @@ package immutable
 //
 // Copying the vector is cheap, but since it is a struct,
 // it is not done atomically. To get atomic copying, use
-// atomic.Value or similar.
+// channels, atomic.Value or similar.
 //
 // The zero Vector is empty and ready for use.
 type Vector struct {

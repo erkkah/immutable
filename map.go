@@ -17,8 +17,8 @@ const (
 // concurrent threads without locks or other synchronization.
 //
 // Copying the map is cheap, but since it is a struct, it is not
-// done atomically. To get atomic copying, use atomic.Value or
-// similar.
+// done atomically. To get atomic copying, use channels, atomic.Value
+// or similar.
 //
 // Map is different from Go map and sync.Map since it safe to
 // copy and is copied by value.
